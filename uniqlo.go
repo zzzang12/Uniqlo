@@ -10,8 +10,6 @@ import (
 
 func main() {
 	listPage := "https://store-kr.uniqlo.com/display/displayShop.lecs?displayNo=NQ1A01A11A02"
-	detailPage := "https://store-kr.uniqlo.com/display/showDisplayCache.lecs?displayNo=NQ1A01A11A02"
-	detailPage += "&goodsNo=NQ31144695"
 
 	res, err := http.Get(listPage)
 	checkError(err)
@@ -19,14 +17,18 @@ func main() {
 	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
+	checkError(err)
 
 	doc.Find("#content1 .blkMultibuyContent").Each(func(_ int, topic *goquery.Selection) {
 		topicName := topic.Find("p").Text()
-		makeDirectory(topicName)
+		createDirectory(topicName)
 		topic.Next().Find(".uniqlo_info .item").Each(func(_ int, item *goquery.Selection) {
-			goodsCode, _ := item.Find("#quickViewLayerBtn").Attr("href")
-			goodsCode = strings.Split(goodsCode, "'")[1]
-			makeFile(topicName, goodsCode)
+			goodsCode, _ := item.Find(".tumb_img>a").Attr("href")
+			goodsCode = strings.Split(goodsCode, "=")[2]
+			imageAddress, _ := item.Find(".tumb_img>a>img").Attr("src")
+			imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
+
+			createFile(topicName, goodsCode)
 		})
 	})
 }
@@ -43,16 +45,15 @@ func checkStatusCode(res *http.Response) {
 	}
 }
 
-func makeDirectory(topicName string) {
+func createDirectory(topicName string) {
 	path := "list/" + topicName
-	if err := os.MkdirAll(path, 0777); err != nil {
-		log.Fatal(err)
-	}
+	err := os.MkdirAll(path, 0777)
+	checkError(err)
 }
 
-func makeFile(topicName, goodsCode string) {
+func createFile(topicName, goodsCode string) *os.File {
 	path := "list/" + topicName + "/" + goodsCode
-	if _, err := os.Create(path); err != nil {
-		log.Fatal(err)
-	}
+	file, err := os.Create(path)
+	checkError(err)
+	return file
 }
