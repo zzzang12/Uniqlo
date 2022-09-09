@@ -1,0 +1,15 @@
+# 디폴트 무시된 파일
+/shelf/
+/workspace.xml
+# 에디터 기반 HTTP 클라이언트 요청
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Go 모듈
+*.mod
+*.sum
+# IDE 세팅 폴더
+.idea/
+# 생성된 파일
+list/
