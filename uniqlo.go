@@ -45,9 +45,9 @@ func checkError(err error) {
 	}
 }
 
-func checkStatusCode(res *http.Response) {
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %s", res.Status)
+func checkStatusCode(resp *http.Response) {
+	if resp.StatusCode != 200 {
+		log.Fatalf("status code error: %s", resp.Status)
 	}
 }
 
