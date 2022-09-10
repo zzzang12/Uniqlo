@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/PuerkitoBio/goquery"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -11,12 +12,10 @@ import (
 func main() {
 	listPage := "https://store-kr.uniqlo.com/display/displayShop.lecs?displayNo=NQ1A01A11A02"
 
-	res, err := http.Get(listPage)
-	checkError(err)
-	checkStatusCode(res)
-	defer res.Body.Close()
+	resp := httpGet(listPage)
+	defer resp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	checkError(err)
 
 	doc.Find("#content1 .blkMultibuyContent").Each(func(_ int, topic *goquery.Selection) {
@@ -24,13 +23,20 @@ func main() {
 		createDirectory(topicName)
 		topic.Next().Find(".uniqlo_info .item").Each(func(_ int, item *goquery.Selection) {
 			goodsCode, _ := item.Find(".tumb_img>a").Attr("href")
-			goodsCode = strings.Split(goodsCode, "=")[2]
+			goodsCode = strings.FieldsFunc(goodsCode, split)[1]
 			imageAddress, _ := item.Find(".tumb_img>a>img").Attr("src")
 			imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
 
-			createFile(topicName, goodsCode)
+			createFile(imageAddress, topicName, goodsCode)
 		})
 	})
+}
+
+func httpGet(url string) *http.Response {
+	resp, err := http.Get(url)
+	checkError(err)
+	checkStatusCode(resp)
+	return resp
 }
 
 func checkError(err error) {
@@ -45,15 +51,25 @@ func checkStatusCode(res *http.Response) {
 	}
 }
 
+func split(r rune) bool {
+	return r == '=' || r == '&'
+}
+
 func createDirectory(topicName string) {
 	path := "list/" + topicName
 	err := os.MkdirAll(path, 0777)
 	checkError(err)
 }
 
-func createFile(topicName, goodsCode string) *os.File {
-	path := "list/" + topicName + "/" + goodsCode
+func createFile(imageAddress, topicName, goodsCode string) {
+	resp := httpGet(imageAddress)
+	defer resp.Body.Close()
+
+	path := "list/" + topicName + "/" + goodsCode + ".jpg"
 	file, err := os.Create(path)
 	checkError(err)
-	return file
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	checkError(err)
 }
