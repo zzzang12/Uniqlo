@@ -51,8 +51,8 @@ func checkStatusCode(resp *http.Response) {
 	}
 }
 
-func split(r rune) bool {
-	return r == '=' || r == '&'
+func split(c rune) bool {
+	return c == '=' || c == '&'
 }
 
 func createDirectory(topicName string) {
