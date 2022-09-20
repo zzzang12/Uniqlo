@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"log"
@@ -9,6 +10,11 @@ import (
 	"strings"
 	"sync"
 )
+
+type item struct {
+	topicName string
+	goodsCode string
+}
 
 func main() {
 	listPage := "https://store-kr.uniqlo.com/display/displayShop.lecs?displayNo=NQ1A01A11A02"
@@ -19,8 +25,8 @@ func main() {
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	checkError(err)
 
-	test1(doc)
-	test2(doc)
+	//test1(doc)
+	//test2(doc)
 	test3(doc)
 }
 
@@ -49,7 +55,7 @@ func test2(doc *goquery.Document) {
 	defer topicWg.Wait()
 
 	sel.Each(func(_ int, topic *goquery.Selection) {
-		go getTopic(topic, topicChan, topicWg)
+		go getTopic2(topic, topicChan, topicWg)
 	})
 
 	//for i := 0; i < topicNumber; i++ {
@@ -58,7 +64,7 @@ func test2(doc *goquery.Document) {
 }
 
 func test3(doc *goquery.Document) {
-	topicChan := make(chan string, 100)
+	itemChan := make(chan item)
 
 	topicWg := &sync.WaitGroup{}
 	sel := doc.Find("#content1 .blkMultibuyContent")
@@ -67,24 +73,42 @@ func test3(doc *goquery.Document) {
 	defer topicWg.Wait()
 
 	sel.Each(func(_ int, topic *goquery.Selection) {
-		go getTopic(topic, topicChan, topicWg)
+		go getTopic3(topic, itemChan, topicWg)
 	})
 
+	for topic := range itemChan {
+		fmt.Println(topic)
+	}
 	//for i := 0; i < topicNumber; i++ {
 	//	fmt.Println(<-topicChan)
 	//}
 }
 
-func getTopic(topic *goquery.Selection, topicChan chan string, topicWg *sync.WaitGroup) {
+func getTopic2(topic *goquery.Selection, topicChan chan string, topicWg *sync.WaitGroup) {
 	topicName := topic.Find("p").Text()
 	topicChan <- topicName
 	createDirectory(topicName)
-	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, item *goquery.Selection) {
-		goodsCode, _ := item.Find(".tumb_img>a").Attr("href")
+	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
+		goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
 		goodsCode = strings.FieldsFunc(goodsCode, split)[1]
-		imageAddress, _ := item.Find(".tumb_img>a>img").Attr("src")
+		imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
 		imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
 
+		createFile(imageAddress, topicName, goodsCode)
+	})
+	topicWg.Done()
+}
+
+func getTopic3(topic *goquery.Selection, itemChan chan item, topicWg *sync.WaitGroup) {
+	topicName := topic.Find("p").Text()
+	createDirectory(topicName)
+	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
+		goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
+		goodsCode = strings.FieldsFunc(goodsCode, split)[1]
+		imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
+		imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
+
+		itemChan <- item{topicName, goodsCode}
 		createFile(imageAddress, topicName, goodsCode)
 	})
 	topicWg.Done()
