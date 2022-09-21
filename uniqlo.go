@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./src"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
@@ -66,22 +67,19 @@ func test2(doc *goquery.Document) {
 func test3(doc *goquery.Document) {
 	itemChan := make(chan item)
 
-	topicWg := &sync.WaitGroup{}
+	topicWg := &src.WaitGroupCount{}
 	sel := doc.Find("#content1 .blkMultibuyContent")
 	topicNumber := sel.Length()
 	topicWg.Add(topicNumber)
 	defer topicWg.Wait()
 
 	sel.Each(func(_ int, topic *goquery.Selection) {
-		go getTopic3(topic, itemChan, topicWg)
+		go getTopic3(topic, topicWg, itemChan)
 	})
 
 	for topic := range itemChan {
 		fmt.Println(topic)
 	}
-	//for i := 0; i < topicNumber; i++ {
-	//	fmt.Println(<-topicChan)
-	//}
 }
 
 func getTopic2(topic *goquery.Selection, topicChan chan string, topicWg *sync.WaitGroup) {
@@ -99,7 +97,7 @@ func getTopic2(topic *goquery.Selection, topicChan chan string, topicWg *sync.Wa
 	topicWg.Done()
 }
 
-func getTopic3(topic *goquery.Selection, itemChan chan item, topicWg *sync.WaitGroup) {
+func getTopic3(topic *goquery.Selection, topicWg *src.WaitGroupCount, itemChan chan item) {
 	topicName := topic.Find("p").Text()
 	createDirectory(topicName)
 	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
@@ -112,6 +110,9 @@ func getTopic3(topic *goquery.Selection, itemChan chan item, topicWg *sync.WaitG
 		createFile(imageAddress, topicName, goodsCode)
 	})
 	topicWg.Done()
+	if topicWg.GetCount() == 0 {
+		close(itemChan)
+	}
 }
 
 func httpGet(url string) *http.Response {
