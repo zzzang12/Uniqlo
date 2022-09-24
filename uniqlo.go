@@ -1,7 +1,7 @@
 package main
 
 import (
-	"./src"
+	wgc "./src/waitgroupcount"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
@@ -9,12 +9,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
+	"sync/atomic"
 )
 
-type item struct {
+type Item struct {
 	topicName string
 	goodsCode string
+	index     int
 }
 
 func main() {
@@ -27,8 +28,8 @@ func main() {
 	checkError(err)
 
 	//test1(doc)
-	//test2(doc)
-	test3(doc)
+	test2(doc)
+	//test3(doc)
 }
 
 func test1(doc *goquery.Document) {
@@ -47,27 +48,46 @@ func test1(doc *goquery.Document) {
 }
 
 func test2(doc *goquery.Document) {
-	topicChan := make(chan string, 100)
+	itemChan := make(chan Item)
 
-	topicWg := &sync.WaitGroup{}
+	topicWg := &wgc.WaitGroupCount{}
 	sel := doc.Find("#content1 .blkMultibuyContent")
 	topicNumber := sel.Length()
 	topicWg.Add(topicNumber)
 	defer topicWg.Wait()
 
 	sel.Each(func(_ int, topic *goquery.Selection) {
-		go getTopic2(topic, topicChan, topicWg)
+		go getTopic2(topic, topicWg, itemChan)
 	})
 
-	//for i := 0; i < topicNumber; i++ {
-	//	fmt.Println(<-topicChan)
-	//}
+	for topic := range itemChan {
+		fmt.Println(topic)
+	}
+}
+
+func getTopic2(topic *goquery.Selection, topicWg *wgc.WaitGroupCount, itemChan chan Item) {
+	index := 1
+	topicName := topic.Find("p").Text()
+	createDirectory(topicName)
+	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
+		goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
+		goodsCode = strings.FieldsFunc(goodsCode, split)[1]
+		imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
+		imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
+
+		itemChan <- Item{topicName, goodsCode, index}
+		index++
+		createFile(imageAddress, topicName, goodsCode)
+	})
+	topicWg.Done()
+	if topicWg.GetCount() == 0 {
+		close(itemChan)
+	}
 }
 
 func test3(doc *goquery.Document) {
-	itemChan := make(chan item)
-
-	topicWg := &src.WaitGroupCount{}
+	itemChan := make(chan Item)
+	topicWg := &wgc.WaitGroupCount{}
 	sel := doc.Find("#content1 .blkMultibuyContent")
 	topicNumber := sel.Length()
 	topicWg.Add(topicNumber)
@@ -77,41 +97,50 @@ func test3(doc *goquery.Document) {
 		go getTopic3(topic, topicWg, itemChan)
 	})
 
-	for topic := range itemChan {
-		fmt.Println(topic)
+	var list []Item
+	for item := range itemChan {
+		list = append(list, item)
+	}
+	for _, elem := range list {
+		fmt.Println(elem)
 	}
 }
 
-func getTopic2(topic *goquery.Selection, topicChan chan string, topicWg *sync.WaitGroup) {
-	topicName := topic.Find("p").Text()
-	topicChan <- topicName
-	createDirectory(topicName)
-	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
-		goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
-		goodsCode = strings.FieldsFunc(goodsCode, split)[1]
-		imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
-		imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
+func getTopic3(topic *goquery.Selection, topicWg *wgc.WaitGroupCount, itemChan chan Item) {
+	var index *atomic.Int64
+	goodsWg := &wgc.WaitGroupCount{}
+	sel := topic.Next().Find(".uniqlo_info .item")
+	goodsNumber := sel.Length()
+	goodsWg.Add(goodsNumber)
+	defer goodsWg.Wait()
 
-		createFile(imageAddress, topicName, goodsCode)
+	topicName := topic.Find("p").Text()
+	createDirectory(topicName)
+
+	sel.Each(func(_ int, goods *goquery.Selection) {
+		go getGoods3(goods, topicWg, goodsWg, itemChan, topicName, index)
 	})
+
 	topicWg.Done()
+	fmt.Println(topicWg.GetCount())
+	if topicWg.GetCount() == 0 {
+		//close(itemChan)
+	}
 }
 
-func getTopic3(topic *goquery.Selection, topicWg *src.WaitGroupCount, itemChan chan item) {
-	topicName := topic.Find("p").Text()
-	createDirectory(topicName)
-	topic.Next().Find(".uniqlo_info .item").Each(func(_ int, goods *goquery.Selection) {
-		goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
-		goodsCode = strings.FieldsFunc(goodsCode, split)[1]
-		imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
-		imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
+func getGoods3(goods *goquery.Selection, topicWg *wgc.WaitGroupCount, goodsWg *wgc.WaitGroupCount, itemChan chan Item, topicName string, index *atomic.Int64) {
+	goodsCode, _ := goods.Find(".tumb_img>a").Attr("href")
+	goodsCode = strings.FieldsFunc(goodsCode, split)[1]
+	imageAddress, _ := goods.Find(".tumb_img>a>img").Attr("src")
+	imageAddress = strings.Replace(imageAddress, "276", "1000", 1)
 
-		itemChan <- item{topicName, goodsCode}
-		createFile(imageAddress, topicName, goodsCode)
-	})
-	topicWg.Done()
-	if topicWg.GetCount() == 0 {
-		close(itemChan)
+	itemChan <- Item{topicName, goodsCode, int(index.Load())}
+	index.Add(1)
+	createFile(imageAddress, topicName, goodsCode)
+
+	goodsWg.Done()
+	if goodsWg.GetCount() == 0 {
+		topicWg.Done()
 	}
 }
 
