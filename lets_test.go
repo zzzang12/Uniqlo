@@ -28,9 +28,9 @@ func BenchmarkTest2(b *testing.B) {
 	}
 }
 
-//func BenchmarkTest3(b *testing.B) {
-//	doc := prerequisite()
-//	for i := 0; i < b.N; i++ {
-//		test3(doc)
-//	}
-//}
+func BenchmarkTest3(b *testing.B) {
+	doc := prerequisite()
+	for i := 0; i < b.N; i++ {
+		test3(doc)
+	}
+}
