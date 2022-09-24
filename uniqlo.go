@@ -2,6 +2,7 @@ package main
 
 import (
 	wgc "./src/waitgroupcount"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"log"
@@ -49,8 +50,8 @@ func test2(doc *goquery.Document) {
 
 	topicWg := &wgc.WaitGroupCount{}
 	sel := doc.Find("#content1 .blkMultibuyContent")
-	topicNumber := sel.Length()
-	topicWg.Add(topicNumber)
+	topicNums := sel.Length()
+	topicWg.Add(topicNums)
 	defer topicWg.Wait()
 
 	sel.Each(func(_ int, topic *goquery.Selection) {
@@ -59,9 +60,11 @@ func test2(doc *goquery.Document) {
 
 	var list []Item
 	for topic := range itemChan {
-		//fmt.Println(topic)
 		list = append(list, topic)
 	}
+	//for _, elem := range list {
+	//	fmt.Println(elem)
+	//}
 }
 
 func getTopic2(topic *goquery.Selection, topicWg *wgc.WaitGroupCount, itemChan chan Item) {
@@ -83,24 +86,34 @@ func getTopic2(topic *goquery.Selection, topicWg *wgc.WaitGroupCount, itemChan c
 }
 
 func test3(doc *goquery.Document) {
+	goodsNums := 0
+	goodsNumsChan := make(chan int)
 	outerChan := make(chan Item)
 	sel := doc.Find("#content1 .blkMultibuyContent")
 	sel.Each(func(_ int, topic *goquery.Selection) {
+		go getGoodsNums3(topic, goodsNumsChan)
+		goodsNums += <-goodsNumsChan
 		go getTopic3(topic, outerChan)
 	})
 
 	var list []Item
-	for i := 0; i < 69; i++ {
+	for i := 0; i < goodsNums; i++ {
 		list = append(list, <-outerChan)
 	}
-	//for _, elem := range list {
-	//	fmt.Println(elem)
-	//}
+	for _, elem := range list {
+		fmt.Println(elem)
+	}
+}
+
+func getGoodsNums3(topic *goquery.Selection, goodsNumsChan chan int) {
+	sel := topic.Next().Find(".uniqlo_info .item")
+	goodsNums := sel.Length()
+	goodsNumsChan <- goodsNums
 }
 
 func getTopic3(topic *goquery.Selection, outerChan chan Item) {
 	sel := topic.Next().Find(".uniqlo_info .item")
-	goodsNumber := sel.Length()
+	goodsNums := sel.Length()
 	topicName := topic.Find("p").Text()
 	createDirectory(topicName)
 
@@ -109,7 +122,7 @@ func getTopic3(topic *goquery.Selection, outerChan chan Item) {
 		go getGoods3(goods, innerChan, topicName)
 	})
 
-	for i := 0; i < goodsNumber; i++ {
+	for i := 0; i < goodsNums; i++ {
 		outerChan <- <-innerChan
 	}
 }
