@@ -199,6 +199,7 @@
 ## 사용법
 ```shell
 git clone github.com/zzzang12/uniqlo.git
+go get github.com/PuerkitoBio/goquery
 go build uniqlo.go
 ./uniqlo.exe
 ```
