@@ -75,7 +75,7 @@
     html 요소 선택자를 넣어서 html 태그를 검색
     
     ```sel```에 ```div```노드가 담김
-  * class 선택
+  * class 선택자
     ```go
     sel := doc.Find(".thisIsClass")
     ```
