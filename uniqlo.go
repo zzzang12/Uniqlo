@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -98,7 +99,7 @@ func split(c rune) bool {
 }
 
 func createDirectory(topicName string) {
-	path := "list/" + topicName
+	path := filepath.Join("list", topicName)
 	err := os.MkdirAll(path, 0777)
 	checkError(err)
 }
@@ -107,7 +108,7 @@ func createFile(imageAddress, topicName, goodsCode string) {
 	resp := httpGet(imageAddress)
 	defer resp.Body.Close()
 
-	path := "list/" + topicName + "/" + goodsCode + ".jpg"
+	path := filepath.Join("list", topicName, goodsCode+".jpg")
 	file, err := os.Create(path)
 	checkError(err)
 	defer file.Close()
