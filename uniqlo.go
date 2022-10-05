@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"log"
@@ -22,6 +23,9 @@ func main() {
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	checkError(err)
+
+	err = checkHTML(doc)
 	checkError(err)
 
 	goodsNums := 0
@@ -92,6 +96,16 @@ func checkStatusCode(resp *http.Response) {
 	if resp.StatusCode != 200 {
 		log.Fatalf("status code error: %s", resp.Status)
 	}
+}
+
+func checkHTML(doc *goquery.Document) error {
+	if sel := doc.Find("#content1 .blkMultibuyContent p"); sel.Nodes == nil {
+		return errors.New("HTML structure changed")
+	}
+	if sel := doc.Find("#content1 .blkItemList .uniqlo_unit .uniqlo_info .item .thumb .tumb_img a img"); sel.Nodes == nil {
+		return errors.New("HTML structure changed")
+	}
+	return nil
 }
 
 func split(c rune) bool {
