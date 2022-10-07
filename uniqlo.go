@@ -29,12 +29,10 @@ func main() {
 	checkError(err)
 
 	goodsNums := 0
-	goodsNumsChan := make(chan int)
-	outerChan := make(chan Item)
+	outerChan := make(chan Item, 100)
 	sel := doc.Find("#content1 .blkMultibuyContent")
 	sel.Each(func(_ int, topic *goquery.Selection) {
-		go getGoodsNums(topic, goodsNumsChan)
-		goodsNums += <-goodsNumsChan
+		goodsNums += topic.Next().Find(".uniqlo_info .item").Length()
 		go getTopic(topic, outerChan)
 	})
 
@@ -47,19 +45,13 @@ func main() {
 	//}
 }
 
-func getGoodsNums(topic *goquery.Selection, goodsNumsChan chan int) {
-	sel := topic.Next().Find(".uniqlo_info .item")
-	goodsNums := sel.Length()
-	goodsNumsChan <- goodsNums
-}
-
 func getTopic(topic *goquery.Selection, outerChan chan Item) {
 	sel := topic.Next().Find(".uniqlo_info .item")
 	goodsNums := sel.Length()
 	topicName := topic.Find("p").Text()
 	createDirectory(topicName)
 
-	innerChan := make(chan Item)
+	innerChan := make(chan Item, 100)
 	sel.Each(func(_ int, goods *goquery.Selection) {
 		go getGoods(goods, innerChan, topicName)
 	})
